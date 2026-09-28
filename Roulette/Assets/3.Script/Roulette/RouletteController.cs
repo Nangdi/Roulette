@@ -7,7 +7,7 @@ using UnityEngine.Video;
 
 // 룰렛 흐름: 대기 → (첫 신호) 회전 연출 → (마지막 신호 후 1초 무신호) 해당 번호 영상 재생 → 대기.
 // 영상 재생 중 다른 번호 신호가 오면 바로 회전 연출로 돌아간다.
-// 통신 프로토콜(RS232): 센서 번호를 ASCII 숫자 + 개행으로 보낸다. 예) "5\n" = 5번 센서 감지.
+// 통신 프로토콜(RS232): "D" + 센서 번호(1~22) + 개행. 예) "D5\n" = 5번 센서 감지.
 // 영상 매핑: StreamingAssets/Video/{센서번호}/ 폴더 안의 첫 번째 영상 파일(이름순).
 public class RouletteController : MonoBehaviour
 {
@@ -93,7 +93,8 @@ public class RouletteController : MonoBehaviour
 
     private void OnSerialReceived(int controllerId, string data)
     {
-        if (int.TryParse(data.Trim(), out int sensorId))
+        string msg = data.Trim();
+        if (msg.Length > 1 && (msg[0] == 'D' || msg[0] == 'd') && int.TryParse(msg.Substring(1), out int sensorId))
             OnSensorSignal(sensorId);
         else
             Debug.LogWarning($"[Roulette] 알 수 없는 신호 무시 (Ctrl {controllerId}): {data}");
