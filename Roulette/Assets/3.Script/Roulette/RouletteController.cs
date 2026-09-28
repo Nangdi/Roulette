@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using UnityEngine.Video;
 
 // 룰렛 흐름: 대기 → (첫 신호) 회전 연출 → (마지막 신호 후 1초 무신호) 해당 번호 영상 재생 → 대기.
+// 영상 재생 중 다른 번호 신호가 오면 바로 회전 연출로 돌아간다.
 // 통신 프로토콜(RS232): 센서 번호를 ASCII 숫자 + 개행으로 보낸다. 예) "5\n" = 5번 센서 감지.
 // 영상 매핑: StreamingAssets/Video/{센서번호}/ 폴더 안의 첫 번째 영상 파일(이름순).
 public class RouletteController : MonoBehaviour
@@ -107,15 +108,21 @@ public class RouletteController : MonoBehaviour
         }
     }
 
-    // 센서 신호 수신. 영상 재생 중에는 무시한다.
+    // 센서 신호 수신.
+    // 영상 재생 중에는 재생 중인 번호와 다른 신호가 오면(룰렛을 다시 돌림) 영상을 멈추고 회전 화면으로 넘어간다.
+    // 같은 번호는 멈춘 위치의 센서가 반복 송신하는 경우일 수 있어 무시한다.
     public void OnSensorSignal(int sensorId)
     {
-        if (state == State.Playing) return;
+        if (state == State.Playing)
+        {
+            if (sensorId == lastSensorId) return;
+            StopVideo();
+        }
 
         lastSensorId = sensorId;
         lastSignalTime = Time.unscaledTime;
 
-        if (state == State.Idle)
+        if (state != State.Spinning)
         {
             state = State.Spinning;
             SetPanels(spin: true);
@@ -176,9 +183,15 @@ public class RouletteController : MonoBehaviour
     private void ShowIdle()
     {
         state = State.Idle;
-        if (videoPlayer.isPlaying || videoPlayer.isPrepared) videoPlayer.Stop();
-        videoImage.texture = null;
+        StopVideo();
         SetPanels(idle: true);
+    }
+
+    private void StopVideo()
+    {
+        // Prepare 중이어도 Stop으로 취소되어 이전 prepareCompleted가 늦게 오지 않는다.
+        videoPlayer.Stop();
+        videoImage.texture = null;
     }
 
     private void SetPanels(bool idle = false, bool spin = false, bool video = false)
